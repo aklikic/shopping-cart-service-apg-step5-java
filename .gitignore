@@ -1,0 +1,15 @@
+target/
+.bsp/
+
+.settings
+.project
+.classpath
+
+.idea
+*.iml
+
+.DS_Store
+
+project/project
+project/target
+.idea/
