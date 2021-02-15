@@ -177,7 +177,7 @@ public class IntegrationTest {
     Cart updatedCart1 = response1.toCompletableFuture().get(requestTimeout.getSeconds(), SECONDS);
     assertEquals("foo", updatedCart1.getItems(0).getItemId());
     assertEquals(42, updatedCart1.getItems(0).getQuantity());
-    CartEvent evt = probe.request(1).requestNext();
+    CartEvent evt = probe.request(1).expectNext();
     assertEquals("cart-1",evt.getCartId());
     assertEquals(true, evt.getItemAdded().isInitialized());
 
@@ -194,5 +194,8 @@ public class IntegrationTest {
     Cart updatedCart2 = response2.toCompletableFuture().get(requestTimeout.getSeconds(), SECONDS);
     assertEquals("bar", updatedCart2.getItems(0).getItemId());
     assertEquals(17, updatedCart2.getItems(0).getQuantity());
+    evt = probe.request(1).expectNext();
+    assertEquals("cart-2",evt.getCartId());
+    assertEquals(true, evt.getItemAdded().isInitialized());
   }
 }

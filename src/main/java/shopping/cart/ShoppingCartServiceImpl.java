@@ -8,13 +8,16 @@ import akka.actor.typed.pubsub.Topic;
 import akka.cluster.sharding.typed.javadsl.ClusterSharding;
 import akka.cluster.sharding.typed.javadsl.EntityRef;
 import akka.grpc.GrpcServiceException;
+import akka.japi.JavaPartialFunction;
 import akka.stream.OverflowStrategy;
 import akka.stream.javadsl.Source;
 import akka.stream.javadsl.SourceQueue;
 import akka.stream.javadsl.SourceQueueWithComplete;
+import akka.stream.typed.javadsl.ActorSource;
 import io.grpc.Status;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeoutException;
@@ -105,18 +108,42 @@ public final class ShoppingCartServiceImpl implements ShoppingCartService {
     return convertError(protoCart);
   }
 
+
   @Override
   public Source<CartEvent, NotUsed> itemStream(ItemStreamRequest in) {
     logger.info("Connection established.");
-    Source<CartEvent, SourceQueueWithComplete<CartEvent>> downstream = Source.<CartEvent>queue(100, OverflowStrategy.backpressure());
-    Source<CartEvent,NotUsed> response = downstream.mapMaterializedValue(sourceQueue->{
-      context.spawn(ShoppingCartConnectionActor.create(cartEventTopic,sourceQueue), UUID.randomUUID().toString());
+    //TODO stream complete and error handling
+    final Source<ShoppingCart.Event, ActorRef<ShoppingCart.Event>> source =
+            ActorSource.<ShoppingCart.Event>actorRef(
+                    (m) -> false, (m)-> Optional.empty(), 100, OverflowStrategy.fail());
+
+    return
+    source.mapMaterializedValue(actor->{
+      cartEventTopic.tell(Topic.subscribe(actor));
       return NotUsed.getInstance();
-    });
-    return response;
+    }).map(ShoppingCartServiceImpl::toProtoCart);
+
   }
 
 
+  private static CartEvent toProtoCart(ShoppingCart.Event event) {
+    CartEvent.Builder cartEvent = CartEvent.newBuilder().setCartId(event.cartId);
+    if(event instanceof ShoppingCart.ItemAdded){
+      ShoppingCart.ItemAdded ev = (ShoppingCart.ItemAdded)event;
+      cartEvent = cartEvent.setItemAdded(CartItemAdded.newBuilder().setItemId(ev.itemId).setQuantity(ev.quantity));
+    }else if(event instanceof ShoppingCart.ItemRemoved){
+      ShoppingCart.ItemRemoved ev = (ShoppingCart.ItemRemoved)event;
+      cartEvent = cartEvent.setItemRemoved(CartItemRemoved.newBuilder().setItemId(ev.itemId).setOldQuantity(ev.oldQuantity));
+    }else if(event instanceof ShoppingCart.ItemQuantityAdjusted){
+      ShoppingCart.ItemQuantityAdjusted ev = (ShoppingCart.ItemQuantityAdjusted)event;
+      cartEvent = cartEvent.setItemQuantityAdjusted(CartItemQuantityAdjusted.newBuilder().setNewQuantity(ev.newQuantity).setOldQuantity(ev.oldQuantity));
+    }else if(event instanceof ShoppingCart.CheckedOut){
+      ShoppingCart.CheckedOut ev = (ShoppingCart.CheckedOut)event;
+      cartEvent = cartEvent.setCartCheckedOut(CartCheckedOut.newBuilder().setEventTime(ev.eventTime.toEpochMilli()));
+    }
+
+    return cartEvent.build();
+  }
   private static Cart toProtoCart(ShoppingCart.Summary cart) {
     List<Item> protoItems =
         cart.items.entrySet().stream()
