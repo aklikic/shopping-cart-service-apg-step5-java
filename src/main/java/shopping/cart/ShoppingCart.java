@@ -308,7 +308,7 @@ public final class ShoppingCart
   }
   
 
-  static final EntityTypeKey<Command> ENTITY_KEY =
+  public static final EntityTypeKey<Command> ENTITY_KEY =
       EntityTypeKey.create(Command.class, "ShoppingCart");
 
   public static void init(ActorSystem<?> system,ActorRef<Topic.Command<ShoppingCart.Event>> cartEventTopic) {

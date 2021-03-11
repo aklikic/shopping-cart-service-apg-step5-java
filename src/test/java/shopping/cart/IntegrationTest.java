@@ -161,25 +161,48 @@ public class IntegrationTest {
   @Test
   public void updateFromDifferentNodesViaGrpc() throws Exception {
 
-    Source<CartEvent, NotUsed> stream = testNode1.getClient().itemStream(ItemStreamRequest.newBuilder().build());
-    TestSubscriber.Probe<CartEvent> probe = stream.runWith(TestSink.probe(testNode1.system.classicSystem()), testNode1.system.classicSystem());
+    String cartId1 = "cart-6";
+    long cart1SeqNum = 0l;
+    ItemStreamJournalCartSeqNum.Builder CartSeqNum1 = ItemStreamJournalCartSeqNum.newBuilder().setCartId(cartId1).setEventSeqNum(cart1SeqNum);
 
+    String cartId2 = "cart-7";
+    long cart2SeqNum = 0l;
+    ItemStreamJournalCartSeqNum.Builder CartSeqNum2 = ItemStreamJournalCartSeqNum.newBuilder().setCartId(cartId2).setEventSeqNum(cart2SeqNum);
+
+//    Source<CartEvent, NotUsed> stream = testNode1.getClient().itemStream(ItemStreamRequest.newBuilder().build());
+//    TestSubscriber.Probe<CartEvent> probe = stream.runWith(TestSink.probe(testNode1.system.classicSystem()), testNode1.system.classicSystem());
+
+    Source<CartEvent, NotUsed> streamJournal = testNode1.getClient().itemStreamJournal(ItemStreamJournalRequest.newBuilder().addCartSeqNum(CartSeqNum1).addCartSeqNum(CartSeqNum2).build());
+    TestSubscriber.Probe<CartEvent> probeJournal = streamJournal.runWith(TestSink.probe(testNode1.system.classicSystem()), testNode1.system.classicSystem());
+
+
+
+    CartEvent evt = null;
     // add from client1
     CompletionStage<Cart> response1 =
         testNode1
             .getClient()
             .addItem(
                 AddItemRequest.newBuilder()
-                    .setCartId("cart-1")
+                    .setCartId(cartId1)
                     .setItemId("foo")
                     .setQuantity(42)
                     .build());
     Cart updatedCart1 = response1.toCompletableFuture().get(requestTimeout.getSeconds(), SECONDS);
     assertEquals("foo", updatedCart1.getItems(0).getItemId());
     assertEquals(42, updatedCart1.getItems(0).getQuantity());
-    CartEvent evt = probe.request(1).expectNext();
-    assertEquals("cart-1",evt.getCartId());
+
+//    evt = probe.request(1).expectNext();
+//    assertEquals(cartId1,evt.getCartId());
+//    assertEquals(true, evt.getItemAdded().isInitialized());
+
+    evt = probeJournal.request(1).expectNext();
     assertEquals(true, evt.getItemAdded().isInitialized());
+    assertEquals(1L,evt.getEventSeqNum());
+    if(evt.getCartId().equals(cartId1))
+      cart1SeqNum = evt.getEventSeqNum();
+    else
+      cart2SeqNum = evt.getEventSeqNum();
 
     // add from client2
     CompletionStage<Cart> response2 =
@@ -187,15 +210,50 @@ public class IntegrationTest {
             .getClient()
             .addItem(
                 AddItemRequest.newBuilder()
-                    .setCartId("cart-2")
+                    .setCartId(cartId2)
                     .setItemId("bar")
                     .setQuantity(17)
                     .build());
     Cart updatedCart2 = response2.toCompletableFuture().get(requestTimeout.getSeconds(), SECONDS);
     assertEquals("bar", updatedCart2.getItems(0).getItemId());
     assertEquals(17, updatedCart2.getItems(0).getQuantity());
-    evt = probe.request(1).expectNext();
-    assertEquals("cart-2",evt.getCartId());
+
+//    evt = probe.request(1).expectNext();
+//    assertEquals(cartId2,evt.getCartId());
+//    assertEquals(true, evt.getItemAdded().isInitialized());
+
+    evt = probeJournal.request(1).expectNext();
     assertEquals(true, evt.getItemAdded().isInitialized());
+    assertEquals(1L,evt.getEventSeqNum());
+    if(evt.getCartId().equals(cartId1))
+      cart1SeqNum = evt.getEventSeqNum();
+    else
+      cart2SeqNum = evt.getEventSeqNum();
+
+    probeJournal.cancel();
+
+    CompletionStage<Cart> updateResponse =
+            testNode1
+                    .getClient()
+                    .updateItem(
+                            UpdateItemRequest.newBuilder().build().newBuilder()
+                                    .setCartId(cartId1)
+                                    .setItemId("foo")
+                                    .setQuantity(10)
+                                    .build());
+    Cart updatedCart3 = updateResponse.toCompletableFuture().get(requestTimeout.getSeconds(), SECONDS);
+    assertEquals("foo", updatedCart3.getItems(0).getItemId());
+    assertEquals(10, updatedCart3.getItems(0).getQuantity());
+//    evt = probe.request(1).expectNext();
+//    assertEquals("cart-1",evt.getCartId());
+//    assertEquals(true, evt.getItemAdded().isInitialized());
+
+    streamJournal = testNode1.getClient().itemStreamJournal(ItemStreamJournalRequest.newBuilder().addCartSeqNum(CartSeqNum1.setEventSeqNum(cart1SeqNum+1)).addCartSeqNum(CartSeqNum2.setEventSeqNum(cart2SeqNum+1)).build());
+    probeJournal = streamJournal.runWith(TestSink.probe(testNode1.system.classicSystem()), testNode1.system.classicSystem());
+
+
+    evt = probeJournal.request(1).expectNext();
+    assertEquals(true, evt.getItemAdded().isInitialized());
+    assertEquals(2L,evt.getEventSeqNum());
   }
 }

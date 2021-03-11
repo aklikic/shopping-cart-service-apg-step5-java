@@ -18,6 +18,7 @@ service ShoppingCartService {
     rpc GetCart (GetCartRequest) returns (Cart) {}
 
     rpc ItemStream (ItemStreamRequest) returns (stream CartEvent) {}
+    rpc ItemStreamJournal (ItemStreamJournalRequest) returns (stream CartEvent) {}
 
 }
 
@@ -54,16 +55,29 @@ message Item {
     int32 quantity = 2;
 }
 
+message ItemStreamJournalRequest {
+    string callerId = 1;
+    repeated ItemStreamJournalCartSeqNum cartSeqNum = 2;
+
+}
+
+message ItemStreamJournalCartSeqNum {
+    string cartId = 1;
+    int64 eventSeqNum = 2;
+}
+
+
 message ItemStreamRequest {
     string callerId = 1;
 }
 message CartEvent {
     string cartId = 1;
+    int64 eventSeqNum = 2;
     oneof event {
-        CartItemAdded itemAdded = 2;
-        CartItemQuantityAdjusted itemQuantityAdjusted = 3;
-        CartItemRemoved itemRemoved = 4;
-        CartCheckedOut cartCheckedOut = 5;
+        CartItemAdded itemAdded = 3;
+        CartItemQuantityAdjusted itemQuantityAdjusted = 4;
+        CartItemRemoved itemRemoved = 5;
+        CartCheckedOut cartCheckedOut = 6;
     }
 }
 
