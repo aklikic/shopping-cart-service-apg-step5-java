@@ -25,7 +25,7 @@ public class ShoppingCartTest {
                       + "  \"shopping.cart.CborSerializable\" = jackson-cbor\n"
                       + "}")
               .withFallback(EventSourcedBehaviorTestKit.config()));
-  private static final ActorRef<Topic.Command<ShoppingCart.Event>> cartEventTopic = null;// TODO testKit.system().spawn(Topic.create(ShoppingCart.Event.class, "cart-event-topic"), "CartEventTopic");
+  private static final ActorRef<Topic.Command<PubSubEvent>> cartEventTopic = null;// TODO testKit.system().spawn(Topic.create(ShoppingCart.Event.class, "cart-event-topic"), "CartEventTopic");
   private EventSourcedBehaviorTestKit<ShoppingCart.Command, ShoppingCart.Event, ShoppingCart.State>
       eventSourcedTestKit =
           EventSourcedBehaviorTestKit.create(testKit.system(), ShoppingCart.create(CART_ID,cartEventTopic));

@@ -4,6 +4,7 @@ import akka.actor.typed.ActorRef;
 import akka.actor.typed.ActorSystem;
 import akka.actor.typed.Behavior;
 import akka.actor.typed.SupervisorStrategy;
+import akka.actor.typed.javadsl.ActorContext;
 import akka.actor.typed.javadsl.Behaviors;
 import akka.actor.typed.pubsub.Topic;
 import akka.cluster.sharding.typed.javadsl.ClusterSharding;
@@ -311,7 +312,7 @@ public final class ShoppingCart
   public static final EntityTypeKey<Command> ENTITY_KEY =
       EntityTypeKey.create(Command.class, "ShoppingCart");
 
-  public static void init(ActorSystem<?> system,ActorRef<Topic.Command<ShoppingCart.Event>> cartEventTopic) {
+  public static void init(ActorSystem<?> system,ActorRef<Topic.Command<PubSubEvent>> cartEventTopic) {
     ClusterSharding.get(system)
         .init(
             Entity.of(
@@ -321,22 +322,25 @@ public final class ShoppingCart
                 }));
   }
 
-  public static Behavior<Command> create(String cartId,ActorRef<Topic.Command<ShoppingCart.Event>> cartEventTopic) {
-    return Behaviors.setup(ctx -> EventSourcedBehavior.start(new ShoppingCart(cartId,cartEventTopic), ctx));
+  public static Behavior<Command> create(String cartId,ActorRef<Topic.Command<PubSubEvent>> cartEventTopic) {
+    return Behaviors.setup(ctx -> EventSourcedBehavior.start(new ShoppingCart(cartId,cartEventTopic,ctx), ctx));
   }
 
   private final String cartId;
-  private final ActorRef<Topic.Command<ShoppingCart.Event>> cartEventTopic;
+  private final ActorRef<Topic.Command<PubSubEvent>> cartEventTopic;
+  private final ActorContext context;
   private Procedure<State> commonChainedEffect (ShoppingCart.Event event) {
-    return state -> cartEventTopic.tell(Topic.publish(event));
+    long seqNum = lastSequenceNumber(context);
+    return state -> cartEventTopic.tell(Topic.publish(new PubSubEvent(event,seqNum)));
   }
 
-  private ShoppingCart(String cartId, ActorRef<Topic.Command<ShoppingCart.Event>> cartEventTopic) {
+  private ShoppingCart(String cartId, ActorRef<Topic.Command<PubSubEvent>> cartEventTopic,ActorContext context) {
     super(
         PersistenceId.of(ENTITY_KEY.name(), cartId),
         SupervisorStrategy.restartWithBackoff(Duration.ofMillis(200), Duration.ofSeconds(5), 0.1));
     this.cartId = cartId;
     this.cartEventTopic = cartEventTopic;
+    this.context = context;
 
   }
 

@@ -40,14 +40,14 @@ public final class ShoppingCartServiceImpl implements ShoppingCartService {
 
   private static final Logger logger = LoggerFactory.getLogger(ShoppingCartServiceImpl.class);
 
-  private final ActorRef<Topic.Command<ShoppingCart.Event>> cartEventTopic;
+  private final ActorRef<Topic.Command<PubSubEvent>> cartEventTopic;
   private final Duration timeout;
   private final ClusterSharding sharding;
   private final ActorSystem<?> system;
   private final ActorContext<?> context;
   private final JdbcReadJournal readJournal;
 
-  public ShoppingCartServiceImpl(ActorSystem<?> system, ActorContext<?> context, akka.actor.typed.ActorRef<Topic.Command<ShoppingCart.Event>> cartEventTopic,JdbcReadJournal readJournal) {
+  public ShoppingCartServiceImpl(ActorSystem<?> system, ActorContext<?> context, akka.actor.typed.ActorRef<Topic.Command<PubSubEvent>> cartEventTopic,JdbcReadJournal readJournal) {
     this.cartEventTopic = cartEventTopic;
     timeout = system.settings().config().getDuration("shopping-cart-service.ask-timeout");
     sharding = ClusterSharding.get(system);
@@ -125,8 +125,8 @@ public final class ShoppingCartServiceImpl implements ShoppingCartService {
   public Source<CartEvent, NotUsed> itemStream(ItemStreamRequest in) {
     logger.info("itemStream Connection established.");
     //TODO stream complete and error handling
-    final Source<ShoppingCart.Event, ActorRef<ShoppingCart.Event>> source =
-            ActorSource.<ShoppingCart.Event>actorRef(
+    final Source<PubSubEvent, ActorRef<PubSubEvent>> source =
+            ActorSource.<PubSubEvent>actorRef(
                     (m) -> false,
                     (m)-> Optional.empty(),
                     100,
@@ -159,8 +159,8 @@ public final class ShoppingCartServiceImpl implements ShoppingCartService {
   private static CartEvent toProtoCart(EventEnvelope event) {
     return toProtoCart((ShoppingCart.Event) event.event(),event.sequenceNr());
   }
-  private static CartEvent toProtoCart(ShoppingCart.Event event) {
-    return toProtoCart(event,-1);
+  private static CartEvent toProtoCart(PubSubEvent event) {
+    return toProtoCart(event.event,event.eventSeqNum);
   }
   private static CartEvent toProtoCart(ShoppingCart.Event event,long seqNumber) {
     CartEvent.Builder cartEvent = CartEvent.newBuilder().setCartId(event.cartId);

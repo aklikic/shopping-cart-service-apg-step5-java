@@ -32,8 +32,8 @@ public class Main extends AbstractBehavior<Void> {
     AkkaManagement.get(system).start();
     ClusterBootstrap.get(system).start();
 
-    ActorRef<Topic.Command<ShoppingCart.Event>> cartEventTopic =
-            context.spawn(Topic.create(ShoppingCart.Event.class, "cart-event-topic"), "CartEventTopic");
+    ActorRef<Topic.Command<PubSubEvent>> cartEventTopic =
+            context.spawn(Topic.create(PubSubEvent.class, "cart-event-topic"), "CartEventTopic");
 
     ShoppingCart.init(system,cartEventTopic);
 
